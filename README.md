@@ -6,9 +6,9 @@
   <img  src="https://static.wikia.nocookie.net/leagueoflegends/images/1/1b/Pyke_OriginalSkin.jpg/revision/latest?cb=20210923013910">
   <br>
   <img  src="https://img.shields.io/github/languages/top/Entity378/Bone-Skewer-Grabber?color=2b565e">
-  <img  src="https://img.shields.io/github/stars/Entity378/Bone-Skewer-Grabber?color=6d00c1&logoColor=2b565e">
+  <img  src="https://img.shields.io/github/stars/Entity378/Bone-Skewer-Grabber?color=2b565e&logoColor=2b565e">
   <img  src="https://img.shields.io/github/commit-activity/w/Entity378/Bone-Skewer-Grabber?color=2b565e">
-  <img  src="https://img.shields.io/github/last-commit/Entity378/Bone-Skewer-Grabber?color=6d00c1&logoColor=2b565e">
+  <img  src="https://img.shields.io/github/last-commit/Entity378/Bone-Skewer-Grabber?color=2b565e&logoColor=2b565e">
   <br>
   <hr  style="border-radius: 2%; margin-top: 60px; margin-bottom: 60px;"  noshade=""  size="20"  width="100%">
 </div>
