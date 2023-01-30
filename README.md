@@ -80,7 +80,7 @@ Once you've downloaded the files extract the folder so it's no longer a .zip fil
 You dont need to install any modules opening the install them for you.
 Then you can open the builder.py file which willopen the gui.
 ```
-### 3. Create A Webhook:
+### 3. Create A Discord Webhook:
 
 ```
 This webhook will be sent any victims you log so don't delete it once it's made.
