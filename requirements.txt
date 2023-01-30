@@ -1,11 +1,11 @@
 # Logger
 psutil
 cryptography
-discord
 httpx
 requests
 pypiwin32
 wmi
+requests_toolbelt
 # Builder
 alive-progress
 colorama
