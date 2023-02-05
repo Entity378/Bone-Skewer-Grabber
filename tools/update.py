@@ -7,14 +7,14 @@ import requests
 
 class Update():
     def __init__(self):
-        self.version = '1.3.3'
+        self.version = '1.4.0'
         self.github = 'https://raw.githubusercontent.com/Entity378/Bone-Skewer-Grabber/main/tools/update.py'
         self.zipfile = 'https://codeload.github.com/Entity378/Bone-Skewer-Grabber/zip/refs/heads/main'
         self.update_checker()
 
     def update_checker(self):
         code = requests.get(self.github).text
-        if "self.version = '1.3.3'" in code:
+        if "self.version = '1.4.0'" in code:
             print('This version is up to date!')
             print('Exiting...')
             sleep(2)
